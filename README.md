@@ -43,6 +43,14 @@ python3 -m http.server 8080
 npx serve .
 ```
 
+## Modelos 3D incluídos
+
+A pasta `models/` já traz um bebê esculpido para as semanas 10, 12, 14, 16, 20,
+24, 28, 32, 36 e 40 (gerados por `tools/fetus.py`: SDF + marching cubes, com
+cores de pele, pálpebras, lábios e cordão umbilical). As proporções mudam com a
+semana: cabeça grande e pele fina e rosada no começo, membros mais gordinhos no
+fim. Para trocar por modelos próprios, siga os passos abaixo.
+
 ## Ligar os modelos 3D
 
 1. Exporte os `.glb` com o nome `week_<semana>.glb` dentro de `models/`.

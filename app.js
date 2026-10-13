@@ -39,7 +39,7 @@ const CONFIG = {
   modelPath: 'models/week_{week}.glb',
 
   /** Semanas para as quais você realmente tem arquivo .glb na pasta models/. */
-  availableModels: [], // ex.: [8, 12, 16, 20, 24, 28, 32, 36, 40]
+  availableModels: [10, 12, 14, 16, 20, 24, 28, 32, 36, 40],
 
   /** Nome carinhoso exibido no título (opcional, só estético). */
   babyName: 'você'
@@ -312,7 +312,7 @@ const Scene3D = {
     this.renderer.setSize(w, h);
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.05;
+    this.renderer.toneMappingExposure = 1.0;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -337,7 +337,7 @@ const Scene3D = {
      *   rim      → contraluz por trás, cria o contorno luminoso na silhueta
      *   ambient  → hemisférica, levanta as sombras sem achatar o volume
      */
-    const ambient = new THREE.HemisphereLight(0xffffff, 0xbcd8f7, 1.05);
+    const ambient = new THREE.HemisphereLight(0xffffff, 0xbcd8f7, 0.6);
     this.scene.add(ambient);
 
     const key = new THREE.DirectionalLight(0xffe6b8, 2.2);     // dourado
@@ -429,8 +429,10 @@ const Scene3D = {
    * ====================================================================== */
   loadWeekModel(currentWeek) {
     // Escolhe a semana do arquivo: a maior disponível que seja <= semana atual.
+    // (antes da 1ª semana disponível, usa o menor modelo que existir)
     const candidates = CONFIG.availableModels.filter(w => w <= currentWeek);
-    const modelWeek = candidates.length ? Math.max(...candidates) : null;
+    const modelWeek = candidates.length ? Math.max(...candidates)
+                    : CONFIG.availableModels.length ? Math.min(...CONFIG.availableModels) : null;
 
     if (modelWeek === null) {
       // Nenhum .glb configurado → forma procedural + aviso discreto na tela.
@@ -456,8 +458,17 @@ const Scene3D = {
       (gltf) => {
         const model = gltf.scene;
 
+        // Materiais de pele e cordão (os .glb trazem as cores por vértice).
+        let skinMesh = null;
+        model.traverse((o) => {
+          if (!o.isMesh) return;
+          if (o.name.includes('cord')) o.material = createCordMaterial();
+          else if (o.geometry.attributes.color) { o.material = createSkinMaterial(); skinMesh = skinMesh || o; }
+        });
+
         // Normaliza escala e centro: o .glb pode vir em qualquer unidade.
-        const box = new THREE.Box3().setFromObject(model);
+        // O enquadramento usa só o corpo, para o cordão não "encolher" o bebê.
+        const box = new THREE.Box3().setFromObject(skinMesh || model);
         const size = box.getSize(new THREE.Vector3());
         const center = box.getCenter(new THREE.Vector3());
         const scale = 2.2 / Math.max(size.x, size.y, size.z);
@@ -465,7 +476,7 @@ const Scene3D = {
         model.position.sub(center.multiplyScalar(scale));
 
         model.traverse((o) => {
-          if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; }
+          if (o.isMesh && !o.name.includes('cord')) { o.castShadow = true; o.receiveShadow = true; }
         });
 
         this.setModel(model);
@@ -527,6 +538,41 @@ const Scene3D = {
     this.controls.update();
   }
 };
+
+/* -----------------------------------------------------------------------------
+ * MATERIAIS DOS MODELOS DE SEMANA (models/week_XX.glb)
+ * Pele: sheen avermelhado imita a luz atravessando a pele fina (translucidez),
+ * clearcoat leve dá o aspecto úmido do líquido amniótico.
+ * -------------------------------------------------------------------------- */
+function createSkinMaterial() {
+  return new THREE.MeshPhysicalMaterial({
+    vertexColors: true,
+    roughness: 0.5,
+    metalness: 0,
+    sheen: 1,
+    sheenRoughness: 0.35,
+    sheenColor: new THREE.Color(0xff9a80),
+    clearcoat: 0.18,
+    clearcoatRoughness: 0.45,
+    emissive: new THREE.Color(0x4a120a),
+    emissiveIntensity: 0.22
+  });
+}
+
+function createCordMaterial() {
+  return new THREE.MeshPhysicalMaterial({
+    vertexColors: true,          // inclui alfa: a ponta some suavemente
+    transparent: true,
+    depthWrite: false,
+    roughness: 0.4,
+    clearcoat: 0.35,
+    clearcoatRoughness: 0.3,
+    sheen: 0.6,
+    sheenColor: new THREE.Color(0xffb0b8),
+    emissive: new THREE.Color(0x30101a),
+    emissiveIntensity: 0.3
+  });
+}
 
 /* -----------------------------------------------------------------------------
  * PLACEHOLDER PROCEDURAL
