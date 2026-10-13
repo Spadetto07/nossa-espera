@@ -1,0 +1,427 @@
+/* =========================================================================
+   Nossa Espera — folha de estilo
+   Estética: Glassmorphism + gradientes pastéis em movimento sutil.
+   Paleta: azul bebê (#bcd8f7) · dourado (#e5c07b) · rosa pastel (#f7d4dd)
+   ========================================================================= */
+
+:root {
+  --baby:        #bcd8f7;
+  --baby-deep:   #8fb8e8;
+  --gold:        #e5c07b;
+  --gold-soft:   #f3dfb6;
+  --blush:       #f7d4dd;
+  --mint:        #cfe9df;
+  --ink:         #3f4a5a;
+  --ink-soft:    #7b8798;
+
+  --glass-bg:     rgba(255, 255, 255, 0.42);
+  --glass-border: rgba(255, 255, 255, 0.70);
+  --glass-shadow: 0 8px 32px rgba(120, 140, 180, 0.18);
+  --radius:       26px;
+}
+
+* { -webkit-tap-highlight-color: transparent; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  font-family: 'Inter', system-ui, sans-serif;
+  background: #f4f7fc;
+  color: var(--ink);
+}
+
+/* =========================================================================
+   1. FUNDO — "aurora" de gradientes pastéis com deriva lenta
+   Três blobs com blur muito alto que flutuam em ciclos longos e
+   dessincronizados, criando movimento orgânico sem distrair.
+   ========================================================================= */
+.aurora {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  background:
+    radial-gradient(120% 90% at 50% 0%,  #ffffff 0%, #eef4fd 45%, #f6eef4 100%);
+}
+
+.aurora__blob {
+  position: absolute;
+  display: block;
+  border-radius: 50%;
+  filter: blur(90px);
+  opacity: 0.75;
+  will-change: transform;
+}
+
+.aurora__blob--1 {
+  width: 46vmax; height: 46vmax;
+  top: -14vmax; left: -10vmax;
+  background: radial-gradient(circle at 35% 35%, var(--baby), transparent 70%);
+  animation: drift-1 26s ease-in-out infinite alternate;
+}
+
+.aurora__blob--2 {
+  width: 40vmax; height: 40vmax;
+  bottom: -14vmax; right: -8vmax;
+  background: radial-gradient(circle at 60% 40%, var(--blush), transparent 70%);
+  animation: drift-2 32s ease-in-out infinite alternate;
+}
+
+.aurora__blob--3 {
+  width: 34vmax; height: 34vmax;
+  top: 35%; left: 45%;
+  background: radial-gradient(circle at 50% 50%, var(--gold-soft), transparent 70%);
+  opacity: 0.55;
+  animation: drift-3 38s ease-in-out infinite alternate;
+}
+
+/* Grão sutil: tira o aspecto "plástico" do gradiente */
+.aurora__grain {
+  position: absolute;
+  inset: -50%;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)' opacity='0.35'/%3E%3C/svg%3E");
+  opacity: 0.30;
+  mix-blend-mode: soft-light;
+  pointer-events: none;
+}
+
+@keyframes drift-1 {
+  from { transform: translate3d(0, 0, 0) scale(1); }
+  to   { transform: translate3d(6vmax, 5vmax, 0) scale(1.12); }
+}
+@keyframes drift-2 {
+  from { transform: translate3d(0, 0, 0) scale(1.08); }
+  to   { transform: translate3d(-7vmax, -4vmax, 0) scale(1); }
+}
+@keyframes drift-3 {
+  from { transform: translate3d(-4vmax, 2vmax, 0) scale(1); }
+  to   { transform: translate3d(4vmax, -5vmax, 0) scale(1.18); }
+}
+
+/* =========================================================================
+   2. CARTÕES DE VIDRO (Glassmorphism)
+   ========================================================================= */
+.glass {
+  position: relative;
+  padding: 1.4rem 1.5rem;
+  border-radius: var(--radius);
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
+  backdrop-filter: blur(22px) saturate(160%);
+  -webkit-backdrop-filter: blur(22px) saturate(160%);
+  overflow: hidden;
+  animation: rise 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* Brilho superior — reforça a leitura de "vidro" */
+.glass::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.95), transparent);
+}
+
+.glass--hero {
+  padding: 2rem 1.5rem 1.6rem;
+  background: linear-gradient(140deg, rgba(255,255,255,0.58), rgba(255,255,255,0.32));
+}
+
+.glass--canvas {
+  padding: 1.2rem;
+  display: flex;
+  flex-direction: column;
+}
+
+@keyframes rise {
+  from { opacity: 0; transform: translateY(18px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Escalonamento da entrada dos cartões */
+.glass:nth-of-type(1) { animation-delay: 0.05s; }
+.glass:nth-of-type(2) { animation-delay: 0.12s; }
+.glass:nth-of-type(3) { animation-delay: 0.19s; }
+
+/* =========================================================================
+   3. TIPOGRAFIA DE DESTAQUE
+   ========================================================================= */
+.countdown-number {
+  font-family: 'Playfair Display', serif;
+  font-size: clamp(4.5rem, 18vw, 8rem);
+  font-weight: 600;
+  line-height: 0.95;
+  letter-spacing: -0.03em;
+  background: linear-gradient(135deg, var(--baby-deep) 0%, #a9b6e8 45%, var(--gold) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  text-shadow: 0 6px 30px rgba(143, 184, 232, 0.28);
+  font-variant-numeric: tabular-nums;
+}
+
+.stat-value {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.35rem;
+  font-weight: 600;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.stat-label {
+  font-size: 0.66rem;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--ink-soft);
+  margin-top: 0.15rem;
+}
+
+.badge {
+  display: inline-block;
+  padding: 0.35rem 0.9rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #6c5a2e;
+  background: linear-gradient(135deg, var(--gold-soft), rgba(255,255,255,0.6));
+  border: 1px solid rgba(229, 192, 123, 0.55);
+  white-space: nowrap;
+}
+
+.milestone {
+  margin-top: 1rem;
+  padding-top: 0.9rem;
+  border-top: 1px dashed rgba(143, 184, 232, 0.45);
+  font-size: 0.85rem;
+  line-height: 1.5;
+  color: var(--ink-soft);
+}
+
+/* =========================================================================
+   4. CANVAS 3D
+   ========================================================================= */
+.canvas-wrap {
+  position: relative;
+  width: 100%;
+  /* Altura previsível + flex-grow: a cena ocupa a altura de base abaixo e
+     ainda estica para preencher a sobra quando a coluna da direita é maior.
+     Evitamos aspect-ratio aqui porque, combinado com flex-grow, ele torna a
+     altura dependente da largura e o cartão dispara em telas largas. */
+  flex: 1 1 auto;
+  height: clamp(300px, 46vh, 460px);
+  min-height: 300px;
+  border-radius: 20px;
+  overflow: hidden;
+  cursor: grab;
+  background:
+    radial-gradient(circle at 50% 42%, rgba(255, 240, 220, 0.55) 0%, rgba(214, 231, 250, 0.35) 45%, rgba(198, 214, 240, 0.15) 100%);
+  border: 1px solid rgba(255,255,255,0.6);
+  touch-action: none; /* necessário para o OrbitControls no mobile */
+}
+
+.canvas-wrap:active { cursor: grabbing; }
+.canvas-wrap canvas { display: block; width: 100% !important; height: 100% !important; }
+
+.model-fallback {
+  position: absolute;
+  bottom: 10px; left: 50%;
+  transform: translateX(-50%);
+  padding: 0.4rem 0.8rem;
+  border-radius: 12px;
+  font-size: 0.68rem;
+  text-align: center;
+  color: var(--ink-soft);
+  background: rgba(255,255,255,0.65);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255,255,255,0.8);
+  pointer-events: none;
+}
+.model-fallback.hidden { display: none; }
+.model-fallback code { font-size: 0.66rem; color: #8a6d3b; }
+
+/* Botões-pílula */
+.pill {
+  padding: 0.42rem 1rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  color: var(--ink-soft);
+  background: rgba(255,255,255,0.55);
+  border: 1px solid rgba(255,255,255,0.8);
+  transition: all 0.25s ease;
+}
+.pill:hover  { background: rgba(255,255,255,0.85); color: var(--ink); }
+.pill--active {
+  color: #6c5a2e;
+  background: linear-gradient(135deg, var(--gold-soft), rgba(255,255,255,0.7));
+  border-color: rgba(229,192,123,0.6);
+}
+
+/* =========================================================================
+   5. BARRA DE PROGRESSO
+   ========================================================================= */
+.progress {
+  position: relative;
+  height: 14px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.55);
+  border: 1px solid rgba(255,255,255,0.85);
+  box-shadow: inset 0 1px 3px rgba(120,140,180,0.16);
+  overflow: hidden;
+}
+
+.progress__fill {
+  height: 100%;
+  width: 0%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--baby) 0%, #c9c4ee 55%, var(--gold) 100%);
+  box-shadow: 0 0 14px rgba(188, 216, 247, 0.9);
+  /* A largura é animada pelo JS; a transição faz o preenchimento "crescer" */
+  transition: width 1.6s cubic-bezier(0.22, 1, 0.36, 1);
+  position: relative;
+}
+
+/* Brilho que percorre a barra */
+.progress__fill::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.75), transparent);
+  transform: translateX(-100%);
+  animation: sheen 3.4s ease-in-out 1.4s infinite;
+}
+
+@keyframes sheen {
+  0%   { transform: translateX(-100%); }
+  60%  { transform: translateX(100%); }
+  100% { transform: translateX(100%); }
+}
+
+.progress__tick {
+  position: absolute;
+  top: 0; bottom: 0;
+  width: 1px;
+  background: rgba(255,255,255,0.9);
+  z-index: 2;
+}
+
+/* =========================================================================
+   6. LOADER
+   ========================================================================= */
+.loader {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1.1rem;
+  background: #f4f7fc;
+  transition: opacity 0.6s ease, visibility 0.6s ease;
+}
+.loader.is-done { opacity: 0; visibility: hidden; }
+
+.loader__ring {
+  width: 46px; height: 46px;
+  border-radius: 50%;
+  border: 2px solid rgba(188, 216, 247, 0.4);
+  border-top-color: var(--gold);
+  animation: spin 1s linear infinite;
+}
+.loader__text {
+  font-family: 'Playfair Display', serif;
+  font-style: italic;
+  font-size: 0.95rem;
+  color: var(--ink-soft);
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* =========================================================================
+   7. ACESSIBILIDADE / RESPONSIVO
+   ========================================================================= */
+@media (prefers-reduced-motion: reduce) {
+  .aurora__blob,
+  .progress__fill::after,
+  .glass { animation: none !important; }
+  .progress__fill { transition: none; }
+  html { scroll-behavior: auto; }
+}
+
+@media (max-width: 640px) {
+  .glass { padding: 1.15rem 1.15rem; border-radius: 22px; }
+  .glass--hero { padding: 1.6rem 1.15rem 1.3rem; }
+  .canvas-wrap { height: clamp(260px, 62vw, 360px); min-height: 260px; }
+}
+
+/* Navegadores sem backdrop-filter (fallback opaco) */
+@supports not (backdrop-filter: blur(4px)) {
+  .glass { background: rgba(255,255,255,0.82); }
+}
+
+/* =========================================================================
+   8. TEMA ESCURO — segue o modo do sistema de quem abrir a página.
+   Só os tokens são redefinidos; nenhum componente é reescrito.
+   ========================================================================= */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --ink:         #dde5f2;
+    --ink-soft:    #8f9cb2;
+
+    --glass-bg:     rgba(255, 255, 255, 0.055);
+    --glass-border: rgba(255, 255, 255, 0.11);
+    --glass-shadow: 0 8px 36px rgba(0, 0, 0, 0.42);
+  }
+
+  body { background: #101725; }
+
+  .aurora {
+    background: radial-gradient(120% 90% at 50% 0%, #1a2436 0%, #141d2e 45%, #1c1a28 100%);
+  }
+  .aurora__blob     { opacity: 0.38; }
+  .aurora__blob--3  { opacity: 0.28; }
+  .aurora__grain    { opacity: 0.18; }
+
+  .glass::before {
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.28), transparent);
+  }
+  .glass--hero {
+    background: linear-gradient(140deg, rgba(255,255,255,0.10), rgba(255,255,255,0.04));
+  }
+
+  .countdown-number { text-shadow: 0 6px 30px rgba(143, 184, 232, 0.14); }
+  .stat-value, .milestone { color: inherit; }
+  .badge { color: #f0dcae; background: linear-gradient(135deg, rgba(229,192,123,0.22), transparent); }
+
+  .canvas-wrap {
+    background: radial-gradient(circle at 50% 42%,
+      rgba(255,212,168,0.16) 0%, rgba(120,160,215,0.14) 45%, rgba(30,42,64,0.10) 100%);
+  }
+
+  .pill         { background: rgba(255,255,255,0.06); }
+  .pill:hover   { background: rgba(255,255,255,0.12); }
+  .pill--active { color: #f0dcae; background: linear-gradient(135deg, rgba(229,192,123,0.22), transparent); }
+
+  .progress {
+    background: rgba(255,255,255,0.08);
+    border-color: rgba(255,255,255,0.14);
+    box-shadow: inset 0 1px 3px rgba(0,0,0,0.35);
+  }
+  .progress__tick { background: rgba(255,255,255,0.16); }
+  .progress__fill { box-shadow: 0 0 14px rgba(188,216,247,0.35); }
+
+  .loader          { background: #101725; }
+  .loader__ring    { border-color: rgba(255,255,255,0.14); border-top-color: var(--gold); }
+  .model-fallback  { background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.14); }
+}
+
+/* Classes utilitárias do Tailwind que carregam cor fixa precisam seguir o tema */
+@media (prefers-color-scheme: dark) {
+  .text-slate-500 { color: #8f9cb2 !important; }
+  .text-slate-700 { color: #dde5f2 !important; }
+  .text-slate-800 { color: #f0f5fd !important; }
+  .text-slate-400 { color: #6b788c !important; }
+  .divide-white\\/50 > * + * { border-color: rgba(255,255,255,0.10) !important; }
+}
