@@ -7,14 +7,11 @@
  *    [2] TABELA DE SEMANAS     — comparativo de tamanho + marcos
  *    [3] LÓGICA DE DATAS       — idade gestacional, countdown, progresso
  *    [4] RENDER DA UI          — escreve os valores na tela
- *    [5] MOTOR 3D (Three.js)   — cena, luzes, órbita, carga do .glb
+ *    [5] MOTOR 3D              — em baby3d.js (Three.js)
  *    [6] BOOT                  — inicialização e listeners
  * ========================================================================== */
 
-import * as THREE from 'three';
-import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { GLTFLoader }    from 'three/addons/loaders/GLTFLoader.js';
-import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { Scene3D } from './baby3d.js';   // cena 3D do bebê (modelo realista + ajustes por semana)
 
 /* =============================================================================
  * [1] CONFIGURAÇÃO
@@ -35,11 +32,6 @@ const CONFIG = {
   /** Gestação de referência: 280 dias = 40 semanas contadas a partir da DUM. */
   totalDays: 280,
 
-  /** Caminho dos modelos 3D por semana. `{week}` é substituído em runtime. */
-  modelPath: 'models/week_{week}.glb',
-
-  /** Semanas para as quais você realmente tem arquivo .glb na pasta models/. */
-  availableModels: [10, 12, 14, 16, 20, 24, 28, 32, 36, 40],
 
   /** Nome carinhoso exibido no título (opcional, só estético). */
   babyName: 'você'
@@ -270,404 +262,11 @@ function article(word) {
 }
 
 /* =============================================================================
- * [5] MOTOR 3D — Three.js
+ * [5] MOTOR 3D — está em baby3d.js (modelo, pele, proporções por semana)
  * ========================================================================== */
 
-/**
- * Aviso de modelo ausente: útil para você durante o desenvolvimento, ruído para
- * quem só quer ver o bebê. Fica escondido por padrão e aparece com ?debug na URL.
- */
-const DEBUG = new URLSearchParams(location.search).has('debug');
-function showFallbackNote(on) {
-  const el = document.getElementById('modelFallback');
-  if (el) el.classList.toggle('hidden', !(on && DEBUG));
-}
-
-const Scene3D = {
-  renderer: null,
-  scene: null,
-  camera: null,
-  controls: null,
-  clock: null,
-  currentModel: null,   // Object3D atualmente na cena (glb ou placeholder)
-  autoRotate: true,
-  rafId: null,
-
-  /**
-   * INICIALIZAÇÃO DA CENA
-   * @param {HTMLElement} container elemento que receberá o <canvas>
-   * @param {number} week semana gestacional atual (define qual .glb carregar)
-   */
-  init(container, week) {
-    const w = container.clientWidth;
-    const h = container.clientHeight;
-
-    /* --- 5.1 RENDERER ---------------------------------------------------
-     * alpha: true    → fundo transparente, deixa o gradiente CSS aparecer
-     * antialias      → bordas suaves (custo aceitável nesta cena leve)
-     * pixelRatio cap → limitar a 2 evita derrubar o FPS em telas 3x/4x
-     * ACESFilmic     → tone mapping cinematográfico, pele fica mais natural
-     */
-    this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-    this.renderer.setSize(w, h);
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.0;
-    this.renderer.outputColorSpace = THREE.SRGBColorSpace;
-    this.renderer.shadowMap.enabled = true;
-    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-    container.appendChild(this.renderer.domElement);
-
-    /* --- 5.2 CENA E NEBLINA --------------------------------------------- */
-    this.scene = new THREE.Scene();
-    // Fog dá profundidade e faz o modelo "emergir" do fundo suavemente.
-    this.scene.fog = new THREE.FogExp2(0xdfe9f7, 0.055);
-
-    /* --- 5.3 CÂMERA -----------------------------------------------------
-     * FOV 38° (levemente teleobjetiva) evita distorção nas bordas,
-     * o que é importante para formas orgânicas como um feto.
-     */
-    this.camera = new THREE.PerspectiveCamera(38, w / h, 0.1, 100);
-    this.camera.position.set(0, 0.15, 4.2);
-
-    /* --- 5.4 ILUMINAÇÃO — "estúdio suave", azul bebê + dourado ----------
-     * Esquema de 4 pontos:
-     *   key      → luz principal, quente/dourada, vinda de cima à direita
-     *   fill     → preenchimento frio (azul bebê) à esquerda, sem sombra
-     *   rim      → contraluz por trás, cria o contorno luminoso na silhueta
-     *   ambient  → hemisférica, levanta as sombras sem achatar o volume
-     */
-    const ambient = new THREE.HemisphereLight(0xffffff, 0xbcd8f7, 0.6);
-    this.scene.add(ambient);
-
-    const key = new THREE.DirectionalLight(0xffe6b8, 2.2);     // dourado
-    key.position.set(3, 4, 3);
-    key.castShadow = true;
-    key.shadow.mapSize.set(1024, 1024);
-    key.shadow.radius = 6;            // sombras bem suaves
-    key.shadow.bias = -0.0005;        // evita "shadow acne"
-    this.scene.add(key);
-
-    const fill = new THREE.DirectionalLight(0xbcd8f7, 1.1);    // azul bebê
-    fill.position.set(-4, 1, 2);
-    this.scene.add(fill);
-
-    const rim = new THREE.DirectionalLight(0xffd9e6, 1.6);     // contraluz rosé
-    rim.position.set(-1, 2, -4);
-    this.scene.add(rim);
-
-    // Luz pontual quente bem próxima: simula a luz difusa atravessando o útero.
-    const womb = new THREE.PointLight(0xffb98a, 2.2, 8, 2);
-    womb.position.set(0, -0.6, 1.4);
-    this.scene.add(womb);
-
-    /* --- 5.5 ENVIRONMENT MAP -------------------------------------------
-     * Materiais PBR (MeshPhysicalMaterial) precisam de um envMap para ter
-     * reflexos críveis. RoomEnvironment gera um "estúdio" procedural — sem
-     * baixar nenhum arquivo HDRI, o que mantém o deploy 100% estático.
-     */
-    const pmrem = new THREE.PMREMGenerator(this.renderer);
-    this.scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
-
-    /* --- 5.6 ÓRBITA (rotação com dedo/mouse) ---------------------------- */
-    this.controls = new OrbitControls(this.camera, this.renderer.domElement);
-    this.controls.enableDamping = true;      // inércia — movimento com "peso"
-    this.controls.dampingFactor = 0.06;
-    this.controls.enablePan = false;         // pan atrapalha no mobile
-    this.controls.minDistance = 2.4;
-    this.controls.maxDistance = 7.0;
-    this.controls.minPolarAngle = Math.PI * 0.12;  // trava o topo
-    this.controls.maxPolarAngle = Math.PI * 0.88;  // trava a base
-    this.controls.autoRotate = this.autoRotate;
-    this.controls.autoRotateSpeed = 0.9;
-    this.controls.target.set(0, 0, 0);
-    // Pausa a rotação automática enquanto o usuário interage.
-    this.controls.addEventListener('start', () => { this.controls.autoRotate = false; });
-    this.controls.addEventListener('end',   () => { this.controls.autoRotate = this.autoRotate; });
-
-    /* --- 5.7 PARTÍCULAS (líquido amniótico) ----------------------------- */
-    this.scene.add(createAmnioticParticles());
-
-    /* --- 5.8 CARREGA O MODELO DA SEMANA --------------------------------- */
-    this.loadWeekModel(week);
-
-    /* --- 5.9 LOOP DE RENDER --------------------------------------------- */
-    this.clock = new THREE.Clock();
-    this.animate();
-
-    /* --- 5.10 RESIZE ---------------------------------------------------- */
-    // ResizeObserver é melhor que window.onresize: reage também quando o
-    // layout muda sem a janela mudar (ex.: teclado do celular abrindo).
-    new ResizeObserver(() => this.onResize(container)).observe(container);
-  },
-
-  /* ==========================================================================
-   * >>> AQUI É ONDE VOCÊ CARREGA O ARQUIVO .glb DA SEMANA ATUAL <<<
-   * ==========================================================================
-   *
-   * Coloque seus arquivos na pasta `models/` com este padrão de nome:
-   *
-   *     models/week_8.glb
-   *     models/week_12.glb
-   *     models/week_20.glb   ... etc.
-   *
-   * O caminho é montado a partir de CONFIG.modelPath, resultando em:
-   *
-   *     `models/week_${currentWeek}.glb`
-   *
-   * COMO ATIVAR:
-   *   1. Liste em CONFIG.availableModels (lá no topo) as semanas que você
-   *      realmente possui, ex.: [8, 12, 16, 20, 24, 28, 32, 36, 40].
-   *      A função escolhe automaticamente o modelo disponível mais próximo
-   *      (sem passar da semana atual), então você não precisa dos 40 arquivos.
-   *   2. Se a lista estiver vazia OU o arquivo não existir, cai no
-   *      placeholder procedural — o app nunca quebra.
-   *
-   * DICA DE PERFORMANCE: exporte os .glb com compressão Draco ou Meshopt e
-   * mantenha cada arquivo abaixo de ~3 MB (o GitHub Pages não gosta de
-   * arquivos gigantes e o carregamento no 4G fica pesado).
-   * ====================================================================== */
-  loadWeekModel(currentWeek) {
-    // Escolhe a semana do arquivo: a maior disponível que seja <= semana atual.
-    // (antes da 1ª semana disponível, usa o menor modelo que existir)
-    const candidates = CONFIG.availableModels.filter(w => w <= currentWeek);
-    const modelWeek = candidates.length ? Math.max(...candidates)
-                    : CONFIG.availableModels.length ? Math.min(...CONFIG.availableModels) : null;
-
-    if (modelWeek === null) {
-      // Nenhum .glb configurado → forma procedural + aviso discreto na tela.
-      this.setModel(createPlaceholderFetus(currentWeek));
-      showFallbackNote(true);
-      return;
-    }
-
-    const url = CONFIG.modelPath.replace('{week}', modelWeek);
-    // Equivalente a: const url = `models/week_${modelWeek}.glb`;
-
-    const loader = new GLTFLoader();
-
-    // Se você usar Draco, descomente as 3 linhas abaixo e importe o DRACOLoader:
-    // import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
-    // const draco = new DRACOLoader();
-    // draco.setDecoderPath('https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/libs/draco/');
-    // loader.setDRACOLoader(draco);
-
-    loader.load(
-      url,
-      // --- sucesso ---
-      (gltf) => {
-        const model = gltf.scene;
-
-        // Materiais de pele e cordão (os .glb trazem as cores por vértice).
-        let skinMesh = null;
-        model.traverse((o) => {
-          if (!o.isMesh) return;
-          if (o.name.includes('cord')) o.material = createCordMaterial();
-          else if (o.geometry.attributes.color) { o.material = createSkinMaterial(); skinMesh = skinMesh || o; }
-        });
-
-        // Normaliza escala e centro: o .glb pode vir em qualquer unidade.
-        // O enquadramento usa só o corpo, para o cordão não "encolher" o bebê.
-        const box = new THREE.Box3().setFromObject(skinMesh || model);
-        const size = box.getSize(new THREE.Vector3());
-        const center = box.getCenter(new THREE.Vector3());
-        const scale = 2.2 / Math.max(size.x, size.y, size.z);
-        model.scale.setScalar(scale);
-        model.position.sub(center.multiplyScalar(scale));
-
-        model.traverse((o) => {
-          if (o.isMesh && !o.name.includes('cord')) { o.castShadow = true; o.receiveShadow = true; }
-        });
-
-        this.setModel(model);
-        showFallbackNote(false);
-      },
-      // --- progresso (opcional) ---
-      undefined,
-      // --- erro: arquivo ausente ou corrompido → placeholder ---
-      (err) => {
-        console.warn(`[3D] Não consegui carregar "${url}". Usando placeholder.`, err);
-        this.setModel(createPlaceholderFetus(currentWeek));
-        showFallbackNote(true);
-      }
-    );
-  },
-
-  /** Troca o objeto exibido, liberando a memória do anterior. */
-  setModel(obj) {
-    if (this.currentModel) {
-      this.scene.remove(this.currentModel);
-      disposeObject(this.currentModel);
-    }
-    this.currentModel = obj;
-    this.scene.add(obj);
-  },
-
-  animate() {
-    this.rafId = requestAnimationFrame(() => this.animate());
-    const t = this.clock.getElapsedTime();
-
-    // Flutuação suave: o modelo "boia" no líquido amniótico.
-    if (this.currentModel) {
-      this.currentModel.position.y = Math.sin(t * 0.7) * 0.06;
-      this.currentModel.rotation.z = Math.sin(t * 0.45) * 0.04;
-    }
-
-    this.controls.update();   // obrigatório quando enableDamping = true
-    this.renderer.render(this.scene, this.camera);
-  },
-
-  onResize(container) {
-    const w = container.clientWidth;
-    const h = container.clientHeight;
-    if (!w || !h) return;
-    this.camera.aspect = w / h;
-    this.camera.updateProjectionMatrix();
-    this.renderer.setSize(w, h);
-  },
-
-  toggleAutoRotate() {
-    this.autoRotate = !this.autoRotate;
-    this.controls.autoRotate = this.autoRotate;
-    return this.autoRotate;
-  },
-
-  resetView() {
-    this.camera.position.set(0, 0.15, 4.2);
-    this.controls.target.set(0, 0, 0);
-    this.controls.update();
-  }
-};
-
-/* -----------------------------------------------------------------------------
- * MATERIAIS DOS MODELOS DE SEMANA (models/week_XX.glb)
- * Pele: sheen avermelhado imita a luz atravessando a pele fina (translucidez),
- * clearcoat leve dá o aspecto úmido do líquido amniótico.
- * -------------------------------------------------------------------------- */
-function createSkinMaterial() {
-  return new THREE.MeshPhysicalMaterial({
-    vertexColors: true,
-    roughness: 0.5,
-    metalness: 0,
-    sheen: 1,
-    sheenRoughness: 0.35,
-    sheenColor: new THREE.Color(0xff9a80),
-    clearcoat: 0.18,
-    clearcoatRoughness: 0.45,
-    emissive: new THREE.Color(0x4a120a),
-    emissiveIntensity: 0.22
-  });
-}
-
-function createCordMaterial() {
-  return new THREE.MeshPhysicalMaterial({
-    vertexColors: true,          // inclui alfa: a ponta some suavemente
-    transparent: true,
-    depthWrite: false,
-    roughness: 0.4,
-    clearcoat: 0.35,
-    clearcoatRoughness: 0.3,
-    sheen: 0.6,
-    sheenColor: new THREE.Color(0xffb0b8),
-    emissive: new THREE.Color(0x30101a),
-    emissiveIntensity: 0.3
-  });
-}
-
-/* -----------------------------------------------------------------------------
- * PLACEHOLDER PROCEDURAL
- * Uma forma orgânica translúcida que cresce conforme a semana. Serve para você
- * ver o app funcionando ANTES de ter os .glb prontos. Pode apagar depois.
- * -------------------------------------------------------------------------- */
-function createPlaceholderFetus(week) {
-  const group = new THREE.Group();
-
-  // Escala relativa: da semana 4 (bem pequeno) até a 40 (tamanho cheio).
-  const t = Math.min(1, Math.max(0.12, (week - 4) / 36));
-  const scale = 0.45 + t * 0.85;
-
-  // Material "pele em contraluz": transmissão + espalhamento dão o aspecto
-  // leitoso e translúcido de tecido iluminado por trás.
-  const skin = new THREE.MeshPhysicalMaterial({
-    color: 0xf6d9cf,
-    roughness: 0.55,
-    metalness: 0.0,
-    clearcoat: 0.35,
-    clearcoatRoughness: 0.6,
-    transmission: 0.18,
-    thickness: 0.9,
-    sheen: 0.7,
-    sheenColor: new THREE.Color(0xffc9b0),
-    emissive: new THREE.Color(0x3a1410),
-    emissiveIntensity: 0.25
-  });
-
-  // Cabeça (proporcionalmente grande no início — como de fato é no feto)
-  const headRatio = 1.35 - t * 0.45;
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.62 * headRatio, 64, 48), skin);
-  head.position.set(0, 0.55, 0);
-  head.scale.set(1, 1.05, 0.95);
-  group.add(head);
-
-  // Corpo curvado (posição fetal), aproximado por um toro parcial "gordo"
-  const body = new THREE.Mesh(new THREE.TorusGeometry(0.52, 0.34, 32, 64, Math.PI * 1.35), skin);
-  body.position.set(0.02, -0.25, 0);
-  body.rotation.set(Math.PI * 0.5, 0, Math.PI * 0.15);
-  group.add(body);
-
-  // Membro dobrado, só para quebrar a simetria e dar leitura orgânica
-  const limb = new THREE.Mesh(new THREE.CapsuleGeometry(0.15, 0.5, 12, 24), skin);
-  limb.position.set(0.5, -0.35, 0.25);
-  limb.rotation.z = -0.9;
-  group.add(limb);
-
-  group.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
-  group.scale.setScalar(scale);
-  return group;
-}
-
-/* -----------------------------------------------------------------------------
- * PARTÍCULAS — pontinhos dourados flutuando, sugerem o líquido amniótico.
- * -------------------------------------------------------------------------- */
-function createAmnioticParticles(count = 260) {
-  const positions = new Float32Array(count * 3);
-  for (let i = 0; i < count; i++) {
-    // Distribuição em casca esférica, para envolver o modelo sem entrar nele.
-    const r = 2.0 + Math.random() * 2.2;
-    const theta = Math.random() * Math.PI * 2;
-    const phi = Math.acos(2 * Math.random() - 1);
-    positions[i * 3]     = r * Math.sin(phi) * Math.cos(theta);
-    positions[i * 3 + 1] = r * Math.cos(phi) * 0.7;
-    positions[i * 3 + 2] = r * Math.sin(phi) * Math.sin(theta);
-  }
-
-  const geo = new THREE.BufferGeometry();
-  geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-
-  const mat = new THREE.PointsMaterial({
-    color: 0xffd9a0,
-    size: 0.035,
-    transparent: true,
-    opacity: 0.55,
-    depthWrite: false,                 // evita artefatos de sobreposição
-    blending: THREE.AdditiveBlending,  // pontos "brilham" ao se sobrepor
-    sizeAttenuation: true
-  });
-
-  const points = new THREE.Points(geo, mat);
-  points.name = 'amniotic';
-  return points;
-}
-
-/** Libera geometrias e materiais da GPU ao trocar de modelo. */
-function disposeObject(obj) {
-  obj.traverse((o) => {
-    if (o.geometry) o.geometry.dispose();
-    if (o.material) {
-      (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => m.dispose());
-    }
-  });
-}
+/** Idade gestacional em semanas com fração (o bebê muda um pouquinho a cada dia). */
+const weekFloat = (st) => st.weeks + st.days / 7;
 
 /* =============================================================================
  * [6] BOOT
@@ -683,7 +282,7 @@ function boot() {
   // 3. Sobe a cena 3D com a semana corrente.
   const container = document.getElementById('canvas-wrap');
   try {
-    Scene3D.init(container, state.weeks);
+    Scene3D.init(container, weekFloat(state));
   } catch (err) {
     // WebGL indisponível (navegador antigo, GPU bloqueada): o app segue
     // funcionando como dashboard, só sem o 3D.
@@ -719,7 +318,7 @@ function scheduleMidnightRefresh() {
   setTimeout(() => {
     const s = computeGestation(new Date());
     renderUI(s);
-    Scene3D.loadWeekModel?.(s.weeks);   // troca o modelo se mudou de semana
+    Scene3D.setWeek?.(weekFloat(s));   // ajusta o bebê para o novo dia
     scheduleMidnightRefresh();
   }, ms);
 }

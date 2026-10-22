@@ -9,11 +9,10 @@ DPP configurada: **27 de abril de 2027**.
 /
 ├── index.html      # marcação + importmap do Three.js + Tailwind CDN
 ├── style.css       # glassmorphism, gradiente pastel animado, barra de progresso
-├── app.js          # lógica de datas, render da UI e motor 3D (ES Module)
-└── models/         # coloque aqui os seus week_XX.glb
-    ├── week_8.glb
-    ├── week_12.glb
-    └── ...
+├── app.js        # datas, contagem e interface (ES Module)
+├── baby3d.js     # cena 3D do bebê (Three.js)
+├── models/baby.glb
+└── tools/prep_baby.py
 ```
 
 ## Publicar no GitHub Pages
@@ -43,33 +42,25 @@ python3 -m http.server 8080
 npx serve .
 ```
 
-## Modelos 3D incluídos
+## Bebê 3D
 
-A pasta `models/` já traz um bebê esculpido para as semanas 10, 12, 14, 16, 20,
-24, 28, 32, 36 e 40 (gerados por `tools/fetus.py`: SDF + marching cubes, com
-cores de pele, pálpebras, lábios e cordão umbilical). As proporções mudam com a
-semana: cabeça grande e pele fina e rosada no começo, membros mais gordinhos no
-fim. Para trocar por modelos próprios, siga os passos abaixo.
+`baby3d.js` monta a cena com `models/baby.glb` — baseado no modelo
+[“Baby”, de joekarava](https://sketchfab.com/3d-models/baby-f05a87806cad49feb75ac7659d55c368),
+licença [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) (crédito no rodapé do site).
 
-## Ligar os modelos 3D
+Adaptações (`tools/prep_baby.py`, depois `gltf-transform draco`):
+cabeça e corpo unidos numa malha só, costura do pescoço suavizada, malha
+simplificada (~190 mil triângulos, ~540 KB com Draco) e, por vértice,
+oclusão ambiente (canal R) e espessura local (canal G).
 
-1. Exporte os `.glb` com o nome `week_<semana>.glb` dentro de `models/`.
-2. Em `app.js`, no bloco `CONFIG` (topo do arquivo), liste as semanas que você tem:
+No navegador, a cada dia:
+- a cabeça fica proporcionalmente maior quanto mais cedo na gestação
+  (~1,4× com 12 semanas, tamanho normal com 40);
+- a pele vai de rosada e fina (translúcida nas orelhas, dedos e nariz, com
+  vasinhos sutis) para o tom de recém-nascido;
+- o cordão umbilical é gerado com vasos em espiral.
 
-```js
-availableModels: [8, 12, 16, 20, 24, 28, 32, 36, 40],
-```
-
-O app escolhe sozinho o modelo disponível mais próximo **sem passar** da semana
-atual — ou seja, você não precisa dos 40 arquivos. Se a lista estiver vazia ou o
-arquivo faltar, ele exibe um placeholder procedural e segue funcionando.
-
-O ponto exato do carregamento está marcado em `app.js` no método
-`Scene3D.loadWeekModel()`, com o comentário
-`>>> AQUI É ONDE VOCÊ CARREGA O ARQUIVO .glb DA SEMANA ATUAL <<<`.
-
-**Dica:** exporte com compressão Draco ou Meshopt e mantenha cada arquivo abaixo
-de ~3 MB. Para Draco, descomente as três linhas indicadas em `loadWeekModel()`.
+Os ajustes ficam em `weekLook()` no topo de `baby3d.js`.
 
 ## Tema escuro
 
@@ -80,13 +71,8 @@ escuro simplesmente não aplica.
 
 ## Aviso de modelo ausente
 
-Quando não há `.glb`, o rodapé do canvas mostra `week_XX.glb não encontrado`.
-Esse aviso fica **oculto por padrão** (ninguém que só quer ver o bebê precisa
-vê-lo) e aparece adicionando `?debug` na URL:
-
-```
-https://SEU_USUARIO.github.io/nossa-espera/?debug
-```
+Se `models/baby.glb` não carregar, aparece um aviso no canvas — só com `?debug`
+na URL (`https://spadetto07.github.io/nossa-espera/?debug`).
 
 ## Ajustes rápidos
 
@@ -95,8 +81,8 @@ https://SEU_USUARIO.github.io/nossa-espera/?debug
 | Mudar a DPP | `CONFIG.dpp` em `app.js` |
 | Textos de tamanho por semana | objeto `WEEK_DATA` em `app.js` |
 | Paleta de cores | variáveis `:root` em `style.css` |
-| Intensidade das luzes | seção `5.4 ILUMINAÇÃO` em `app.js` |
-| Velocidade da rotação | `controls.autoRotateSpeed` em `app.js` |
+| Aparência do bebê por semana | `weekLook()` em `baby3d.js` |
+| Luzes e câmera | `Scene3D.init()` em `baby3d.js` |
 
 ## Testar outras datas
 
