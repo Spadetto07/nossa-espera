@@ -216,8 +216,8 @@ body {
   border-radius: 20px;
   overflow: hidden;
   cursor: grab;
-  background:
-    radial-gradient(circle at 50% 42%, rgba(255, 240, 220, 0.55) 0%, rgba(214, 231, 250, 0.35) 45%, rgba(198, 214, 240, 0.15) 100%);
+  /* mesma cor do interior do útero da cena 3D (aparece só enquanto ela carrega) */
+  background: radial-gradient(circle at 46% 40%, #6b2716 0%, #2c0b07 60%, #150403 100%);
   border: 1px solid rgba(255,255,255,0.6);
   touch-action: none; /* necessário para o OrbitControls no mobile */
 }
@@ -395,10 +395,7 @@ body {
   .stat-value, .milestone { color: inherit; }
   .badge { color: #f0dcae; background: linear-gradient(135deg, rgba(229,192,123,0.22), transparent); }
 
-  .canvas-wrap {
-    background: radial-gradient(circle at 50% 42%,
-      rgba(255,212,168,0.16) 0%, rgba(120,160,215,0.14) 45%, rgba(30,42,64,0.10) 100%);
-  }
+  .canvas-wrap { border-color: rgba(255,255,255,0.14); }
 
   .pill         { background: rgba(255,255,255,0.06); }
   .pill:hover   { background: rgba(255,255,255,0.12); }

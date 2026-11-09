@@ -258,7 +258,8 @@ function renderUI(state) {
 
 /** Artigo indefinido em PT-BR — heurística simples pelo final da palavra. */
 function article(word) {
-  return /a$/i.test(word.split(' ')[0]) ? 'uma' : 'um';
+  const w = word.split(' ')[0];
+  return /[aã]$/i.test(w) || /^(semente|vagem|couve-flor|alface)$/i.test(w) ? 'uma' : 'um';
 }
 
 /* =============================================================================

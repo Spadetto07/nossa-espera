@@ -48,19 +48,30 @@ npx serve .
 [“Baby”, de joekarava](https://sketchfab.com/3d-models/baby-f05a87806cad49feb75ac7659d55c368),
 licença [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) (crédito no rodapé do site).
 
-Adaptações (`tools/prep_baby.py`, depois `gltf-transform draco`):
-cabeça e corpo unidos numa malha só, costura do pescoço suavizada, malha
-simplificada (~190 mil triângulos, ~540 KB com Draco) e, por vértice,
-oclusão ambiente (canal R) e espessura local (canal G).
+**Preparo do modelo** (`tools/prep_baby.py`, depois `gltf-transform draco`):
+cabeça e corpo unidos numa malha só, superfície alisada e refeita com triângulos
+regulares (~268 mil, ~850 KB com Draco) e, por vértice: oclusão ambiente,
+espessura local, rubor (lábios, bochechas, nariz, pontas dos dedos), pálpebras e
+linha dos cílios, o deslocamento do corpo “magrinho” e os pesos de movimento de
+antebraços e pernas.
 
-No navegador, a cada dia:
-- a cabeça fica proporcionalmente maior quanto mais cedo na gestação
-  (~1,4× com 12 semanas, tamanho normal com 40);
-- a pele vai de rosada e fina (translúcida nas orelhas, dedos e nariz, com
-  vasinhos sutis) para o tom de recém-nascido;
-- o cordão umbilical é gerado com vasos em espiral.
+**No navegador**, a cada dia (`weekLook()`):
+- cabeça proporcionalmente maior no começo (~1,3× com 16 semanas, normal com 40);
+- corpo magrinho até ~18 semanas, ganhando gordurinha até o parto;
+- pele fina, avermelhada e translúcida no começo; mais clara e opaca no fim.
 
-Os ajustes ficam em `weekLook()` no topo de `baby3d.js`.
+**Pele**: a luz se espalha por baixo da superfície (transição larga de claro para
+escuro, faixa avermelhada na sombra, contraluz atravessando orelhas e dedos),
+microrrelevo e pouco brilho — dentro do líquido a pele não reluz.
+
+**Ambiente**: interior do útero (parede com vasos, claridade alaranjada por trás,
+líquido levemente turvo, partículas), brilho suave, vinheta e grão de foto.
+
+**Movimento**: mãos e pés mexem devagar e, de vez em quando, um chutinho. Fica
+parado para quem usa “reduzir movimento” no sistema.
+
+Em aparelho lento a cena baixa a resolução sozinha e, se precisar, desliga o brilho.
+Parâmetros de teste na URL: `?still` (sem movimento), `?hq` (sem redução de qualidade).
 
 ## Tema escuro
 
@@ -82,7 +93,7 @@ na URL (`https://spadetto07.github.io/nossa-espera/?debug`).
 | Textos de tamanho por semana | objeto `WEEK_DATA` em `app.js` |
 | Paleta de cores | variáveis `:root` em `style.css` |
 | Aparência do bebê por semana | `weekLook()` em `baby3d.js` |
-| Luzes e câmera | `Scene3D.init()` em `baby3d.js` |
+| Luzes, câmera e fundo | `Scene3D.init()` e `createWombMaterial()` em `baby3d.js` |
 
 ## Testar outras datas
 
