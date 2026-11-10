@@ -624,7 +624,8 @@ export const Scene3D = {
   /** Em aparelho lento: primeiro baixa a resolução, depois desliga o brilho. */
   watchPerformance(dt) {
     const p = this.perf;
-    if (QUERY.has('hq') || p.level >= 2 || !this.babyMesh || document.hidden) return;
+    // quadros com mais de 0,2 s são aba em segundo plano (o navegador segura a animação), não aparelho lento
+    if (QUERY.has('hq') || p.level >= 2 || !this.babyMesh || document.hidden || dt > 0.2) return;
     p.frames++; if (p.frames < 20) return;          // ignora o arranque
     p.acc += dt;
     if (p.frames < 80) return;
