@@ -150,7 +150,7 @@ function createSkinMaterial() {
         ${NOISE_GLSL}`)
       .replace('#include <color_fragment>', `
         float aoV = vColor.r;
-        float thin = 1.0 - vColor.g;
+        float thin = clamp(1.0 - vColor.g, 0.0, 1.0);
         float blush = vColor.b;
         float lids = 1.0 - vColor.a;
         // dobras: mais escuras e AVERMELHADAS (não cinza)
@@ -185,14 +185,15 @@ function createSkinMaterial() {
           // contraluz atravessando as partes finas (orelhas, dedos, nariz, lábios)
           float back = pow(clamp(dot(Vv, -normalize(uBackDir + Nn * 0.4)), 0.0, 1.0), 2.5);
           // faixa avermelhada onde a luz vira sombra (marca registrada de pele de verdade)
-          float bleed = exp(-pow((dot(Nn, uKeyDir) + 0.18) / 0.32, 2.0));
+          float bx = (dot(Nn, uKeyDir) + 0.18) / 0.32;      // (sem pow: base negativa vira NaN em GPU real)
+          float bleed = exp(-bx * bx);
           float rim = pow(1.0 - clamp(dot(Nn, Vv), 0.0, 1.0), 2.4);
           vec3 sss = uSss * uSssStrength * (back * (0.22 + 1.25 * pow(thin, 1.6)) + 0.30 * pow(thin, 3.0) + 0.20 * rim * (0.4 + 0.6 * thin));
           sss += diffuseColor.rgb * vec3(1.0, 0.30, 0.20) * bleed * 0.24 * uSssStrength;
-          totalEmissiveRadiance += sss * (0.35 + 0.65 * aoV);
+          totalEmissiveRadiance += max(sss, vec3(0.0)) * (0.35 + 0.65 * aoV);
         }`);
   };
-  mat.customProgramCacheKey = () => 'baby-skin-v4';
+  mat.customProgramCacheKey = () => 'baby-skin-v5';
   return mat;
 }
 
@@ -374,6 +375,19 @@ function createAmnioticParticles() {
   return group;
 }
 
+/** Proteção: um único pixel inválido (NaN) seria espalhado pelo brilho e apagaria a tela toda. */
+const SanitizeShader = {
+  uniforms: { tDiffuse: { value: null } },
+  vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+  fragmentShader: `
+    uniform sampler2D tDiffuse; varying vec2 vUv;
+    void main(){
+      vec3 c = texture2D(tDiffuse, vUv).rgb;
+      if (isnan(c.r) || isnan(c.g) || isnan(c.b) || isinf(c.r) || isinf(c.g) || isinf(c.b)) c = vec3(0.0);
+      gl_FragColor = vec4(clamp(c, 0.0, 32.0), 1.0);
+    }`
+};
+
 /** Acabamento de "foto": vinheta suave e grão fino. */
 const FinishShader = {
   uniforms: { tDiffuse: { value: null }, uTime: { value: 0 } },
@@ -488,6 +502,7 @@ export const Scene3D = {
       const rt = new THREE.WebGLRenderTarget(w * pr, h * pr, { type: THREE.HalfFloatType, samples: 4 });
       this.composer = new EffectComposer(this.renderer, rt);
       this.composer.addPass(new RenderPass(this.scene, this.camera));
+      this.composer.addPass(new ShaderPass(SanitizeShader));
       this.bloom = new UnrealBloomPass(new THREE.Vector2(w, h), 0.32, 0.85, 0.78);
       this.composer.addPass(this.bloom);
       this.composer.addPass(new OutputPass());
@@ -601,7 +616,8 @@ export const Scene3D = {
         gl.readPixels(Math.floor(W * fx), Math.floor(H * fy), 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px);
         sum += px[0] + px[1] + px[2];
       }
-      if (sum === 0) { console.warn('[3D] pós-processamento desligado (quadro preto)'); this.composer = null; }
+      // 5 pontos × 3 canais: abaixo disso é só o grão sobre um quadro preto
+      if (sum < 90) { console.warn('[3D] pós-processamento desligado (quadro preto)'); this.composer = null; }
     } catch (e) { /* segue com o pós-processamento */ }
   },
 
